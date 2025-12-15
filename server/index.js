@@ -14,27 +14,60 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 // CONFIG
 app.get('/api/config/subjects', async (req, res) => {
   try {
-    const { rows } = await executeSQL({ statement: `SELECT DISTINCT Subject FROM business_metadata_config ORDER BY Subject` });
-    res.json(rows.map(r => r.Subject));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const { rows } = await executeSQL({ statement: `SELECT DISTINCT subject FROM metacatalog.metaschema.business_metadata_config ORDER BY subject` });
+    console.log('[DATA] subjects rows:', rows);
+    
+// Defensive mapping for different casings + decode & deduplicate + sort
+    const names = rows
+      .map(r => r.Subject ?? r.subject ?? r.SUBJECT ?? '')      // <- key casing fix
+      .filter(Boolean)
+      .map(s => s.replace(/&amp;/g, '&'))                       // <- optional: decode HTML entity
+      .filter((v, i, a) => a.indexOf(v) === i)                  // <- remove duplicates
+      .sort((a, b) => a.localeCompare(b));
+
+    res.json(names);
+  } catch (e) { 
+    console.error('[ERR] /api/config/subjects', e.message);
+    res.status(500).json({ error: e.message }); }
 });
+
 
 app.get('/api/config/attribute-types', async (req, res) => {
   try {
     const { subject } = req.query;
+    // Log the request for visibility
+    console.log('[REQ] /api/config/attribute-types', { subject });
+
     const { rows } = await executeSQL({
-      statement: `SELECT Attribute_type FROM business_metadata_config WHERE Subject = :subject ORDER BY Attribute_type`,
+      statement: `SELECT attribute_type
+                  FROM metacatalog.metaschema.business_metadata_config
+                  WHERE subject = :subject
+                  ORDER BY attribute_type`,
       parameters: [{ name: 'subject', value: subject }]
     });
-    res.json(rows.map(r => r.Attribute_type));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+
+    console.log('[DATA] attribute_types rows:', rows);
+
+    // Defensive mapping for different casings, decode &amp;, dedupe, sort
+    const types = rows
+      .map(r => r.attribute_type ?? r.Attribute_type ?? r.ATTRIBUTE_TYPE ?? '')
+      .filter(Boolean)
+      .map(s => s.replace(/&amp;/g, '&'))
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .sort((a, b) => a.localeCompare(b));
+
+    res.json(types);
+  } catch (e) {
+    console.error('[ERR] /api/config/attribute-types', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post('/api/config', async (req, res) => {
   try {
     const { sno, entity_type, subject, attribute_type } = req.body;
     await executeSQL({
-      statement: `INSERT INTO business_metadata_config (sno, entity_type, Subject, Attribute_type) VALUES (:sno, :entity_type, :subject, :attribute_type)`,
+      statement: `INSERT INTO business_metadata_config (sno, entity_type, subject, attribute_type) VALUES (:sno, :entity_type, :subject, :attribute_type)`,
       parameters: [
         { name: 'sno', value: String(sno), type: 'INT' },
         { name: 'entity_type', value: entity_type },
@@ -50,7 +83,7 @@ app.put('/api/config', async (req, res) => {
   try {
     const { sno, entity_type, subject, attribute_type } = req.body;
     await executeSQL({
-      statement: `UPDATE business_metadata_config SET entity_type = :entity_type, Subject = :subject, Attribute_type = :attribute_type WHERE sno = :sno`,
+      statement: `UPDATE business_metadata_config SET entity_type = :entity_type, subject = :subject, attribute_type = :attribute_type WHERE sno = :sno`,
       parameters: [
         { name: 'sno', value: String(sno), type: 'INT' },
         { name: 'entity_type', value: entity_type },
