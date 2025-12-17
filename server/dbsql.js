@@ -21,11 +21,11 @@ async function executeSQL({ statement, parameters = [], disposition = 'INLINE', 
 
   const { data } = await axios.post(url, body, { headers });
 
-  if (data?.status?.state === 'SUCCEEDED' && data?.result?.data_array) {
+  if (data?.status?.state === 'SUCCEEDED') {
     return { rows: mapInlineJsonArrayToObjects(data.manifest, data.result), manifest: data.manifest };
   }
 
-  if (data?.status?.state === 'PENDING' || data?.result?.next_chunk_internal_link) {
+  if (data?.status?.state === 'PENDING') {
     const statusUrl = `https://${HOST}/api/2.0/sql/statements/${data.statement_id}`;
     let attempts = 0;
     while (true) {

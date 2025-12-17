@@ -13,7 +13,7 @@ export default function Login() {
       <input value={u} onChange={e => setU(e.target.value)} style={{ width: '100%', marginBottom: 12 }} />
       <label>Password</label>
       <input type="password" value={p} onChange={e => setP(e.target.value)} style={{ width: '100%', marginBottom: 24 }} />
-      <button onClick={() => nav('/main')}>Continue</button>
+      <button onClick={() => nav('/')}>Continue</button>
       <p style={{ color: '#888' }}>Dummy login: any input goes to next page.</p>
     </div>
   );
