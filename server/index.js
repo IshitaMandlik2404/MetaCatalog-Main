@@ -21,7 +21,12 @@ app.use((req, res, next) => {
 
 const TBL_CONFIG = 'metacatalog.metaschema.business_metadata_config';
 const TBL_INSTANCE = 'metacatalog.metaschema.business_metadata_config_instance';
-
+const METADATA_TABLES = {
+  catalog: 'metacatalog.metaschema.business_catalog_metadata_healthcare',
+  schema:  'metacatalog.metaschema.business_schema_metadata_healthcare',
+  table:   'metacatalog.metaschema.business_table_metadata_healthcare',
+  column:  'metacatalog.metaschema.business_column_metadata_healthcare',
+};
 
 function decodeAmpSafe(s) {
   return String(s || '').replace(/&amp;(?:amp;)+/g, '&').replace(/&amp;/g, '&');
@@ -381,58 +386,247 @@ app.get('/api/catalogs', async (req, res) => {
   }
 });
 
+// app.post('/api/catalog/metadata', async (req, res) => {
+//   try {
+//     const { level, catalog, attributes } = req.body;
+
+//     console.log('Received metadata upsert request:', req.body);
+
+//     if (
+//       !level ||
+//       !catalog ||
+//       !attributes ||
+//       typeof attributes !== 'object'
+//     ) {
+//       return res.status(400).json({ error: 'Invalid request payload' });
+//     }
+//     const created_by = req.headers['x-user'] || 'ui';
+
+//     await executeSQL({
+//       statement: `
+//         DELETE FROM metacatalog.metaschema.business_catalog_metadata_healthcare
+//         WHERE catalog_name = ?
+//       `,
+//       parameters: paramVals(catalog),
+//     });
+
+//     for (const [attribute_type, attribute_value] of Object.entries(attributes)) {
+//       await executeSQL({
+//         statement: `
+//           INSERT INTO metacatalog.metaschema.business_catalog_metadata_healthcare
+//           (
+//             attribute_type,
+//             attribute_value,
+//             created_at,
+//             created_by,
+//             catalog_name
+//           )
+//           VALUES ( ?, ?, current_timestamp(), ?, ?)
+//         `,
+//         parameters: paramVals(
+//           attribute_type,
+//           attribute_value,
+//           created_by,
+//           catalog
+//         ),
+//       });
+//     }
+//     console.log('Metadata upsert completed for catalog:', catalog);
+//     res.json({ status: 'OK', inserted: Object.keys(attributes).length });
+//   } catch (e) {
+//     console.error('[ERR] POST /api/catalog/metadata', e);
+//     res.status(500).json({ error: e.message });
+//   }
+// });
+
 app.post('/api/catalog/metadata', async (req, res) => {
   try {
-    const { level, catalog, attributes } = req.body;
+    const {
+      level,
+      catalog,
+      schema,
+      table,
+      column,
+      attributes
+    } = req.body;
 
     console.log('Received metadata upsert request:', req.body);
 
     if (
       !level ||
-      !catalog ||
       !attributes ||
       typeof attributes !== 'object'
     ) {
-      return res.status(400).json({ error: 'Invalid request payload' });
+      return res.status(400).json({ error: 'Invalid payload' });
     }
+
+    if (!METADATA_TABLES[level]) {
+      return res.status(400).json({ error: 'Invalid level' });
+    }
+
+    const tableName = METADATA_TABLES[level];
     const created_by = req.headers['x-user'] || 'ui';
-
-    await executeSQL({
-      statement: `
-        DELETE FROM metacatalog.metaschema.business_catalog_metadata_healthcare
-        WHERE catalog_name = ?
-      `,
-      parameters: paramVals(catalog),
-    });
-
-    for (const [attribute_type, attribute_value] of Object.entries(attributes)) {
+    if (level === 'catalog') {
       await executeSQL({
         statement: `
-          INSERT INTO metacatalog.metaschema.business_catalog_metadata_healthcare
-          (
-            attribute_type,
-            attribute_value,
-            created_at,
-            created_by,
-            catalog_name
-          )
-          VALUES ( ?, ?, current_timestamp(), ?, ?)
+          DELETE FROM ${tableName}
+          WHERE catalog_name = ?
         `,
-        parameters: paramVals(
-          attribute_type,
-          attribute_value,
-          created_by,
-          catalog
-        ),
+        parameters: paramVals(catalog),
       });
     }
-    console.log('Metadata upsert completed for catalog:', catalog);
-    res.json({ status: 'OK', inserted: Object.keys(attributes).length });
+
+    if (level === 'schema') {
+      await executeSQL({
+        statement: `
+          DELETE FROM ${tableName}
+          WHERE catalog_name = ?
+            AND schema_name = ?
+        `,
+        parameters: paramVals(catalog, schema),
+      });
+    }
+
+    if (level === 'table') {
+      await executeSQL({
+        statement: `
+          DELETE FROM ${tableName}
+          WHERE catalog_name = ?
+            AND schema_name = ?
+            AND table_name = ?
+        `,
+        parameters: paramVals(catalog, schema, table),
+      });
+    }
+
+    if (level === 'column') {
+      await executeSQL({
+        statement: `
+          DELETE FROM ${tableName}
+          WHERE catalog_name = ?
+            AND schema_name = ?
+            AND table_name = ?
+            AND column_name = ?
+        `,
+        parameters: paramVals(catalog, schema, table, column),
+      });
+    }
+
+    for (const [attribute_type, attribute_value] of Object.entries(attributes)) {
+
+      if (level === 'catalog') {
+        await executeSQL({
+          statement: `
+            INSERT INTO ${tableName}
+            (
+              catalog_name,
+              attribute_type,
+              attribute_value,
+              created_at,
+              created_by
+            )
+            VALUES (?, ?, ?, current_timestamp(), ?)
+          `,
+          parameters: paramVals(
+            catalog,
+            attribute_type,
+            attribute_value,
+            created_by
+          ),
+        });
+      }
+
+      if (level === 'schema') {
+        await executeSQL({
+          statement: `
+            INSERT INTO ${tableName}
+            (
+              catalog_name,
+              schema_name,
+              attribute_type,
+              attribute_value,
+              created_at,
+              created_by
+            )
+            VALUES (?, ?, ?, ?, current_timestamp(), ?)
+          `,
+          parameters: paramVals(
+            catalog,
+            schema,
+            attribute_type,
+            attribute_value,
+            created_by
+          ),
+        });
+      }
+
+      if (level === 'table') {
+        await executeSQL({
+          statement: `
+            INSERT INTO ${tableName}
+            (
+              catalog_name,
+              schema_name,
+              table_name,
+              attribute_type,
+              attribute_value,
+              created_at,
+              created_by
+            )
+            VALUES (?, ?, ?, ?, ?, current_timestamp(), ?)
+          `,
+          parameters: paramVals(
+            catalog,
+            schema,
+            table,
+            attribute_type,
+            attribute_value,
+            created_by
+          ),
+        });
+      }
+
+      if (level === 'column') {
+        await executeSQL({
+          statement: `
+            INSERT INTO ${tableName}
+            (
+              catalog_name,
+              schema_name,
+              table_name,
+              column_name,
+              attribute_type,
+              attribute_value,
+              created_at,
+              created_by
+            )
+            VALUES (?, ?, ?, ?, ?, ?, current_timestamp(), ?)
+          `,
+          parameters: paramVals(
+            catalog,
+            schema,
+            table,
+            column,
+            attribute_type,
+            attribute_value,
+            created_by
+          ),
+        });
+      }
+    }
+    console.log(`Metadata upsert completed for level: ${level}`);
+    res.json({
+      status: 'OK',
+      level,
+      inserted: Object.keys(attributes).length
+    });
+
   } catch (e) {
     console.error('[ERR] POST /api/catalog/metadata', e);
     res.status(500).json({ error: e.message });
   }
 });
+
 
 app.delete('/api/catalog/metadata', async (req, res) => {
   try {
