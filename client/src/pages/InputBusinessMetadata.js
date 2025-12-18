@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
-    getEntities,
+    getCatalogs,
     getMetadataAttributes,
-    getMetadata,
     upsertMetadata,
-    deleteMetadata
+    getSchemas,
+    getTables,
+    getColumns
 } from '../api';
 
 const styles = {
@@ -22,8 +23,8 @@ const styles = {
         maxWidth: 1000
     },
     heading: { marginBottom: 16, color: '#1f2937' },
-    subText: { color: '#6b7280', marginBottom: 20 },
-    levelButtons: { display: 'flex', gap: 12, marginBottom: 24 },
+    subText: { color: '#6b7280', marginBottom: 20, fontSize: 14 },
+    levelButtons: { display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' },
     button: {
         padding: '10px 18px',
         borderRadius: 10,
@@ -33,83 +34,101 @@ const styles = {
         cursor: 'pointer',
         fontSize: 14
     },
-    secondaryButton: { background: '#059669' },
-    dangerButton: { background: '#dc2626' },
     formGrid: {
         display: 'grid',
         gridTemplateColumns: '180px 1fr',
         gap: '14px 20px',
-        maxWidth: 800
+        maxWidth: 800,
+        marginTop: 10
     },
-    label: { fontWeight: 500, color: '#374151' },
+    label: { fontWeight: 500, color: '#374151', fontSize: 14 },
     input: {
         padding: '10px 12px',
         borderRadius: 10,
         border: '1px solid #d1d5db',
         fontSize: 14
     },
-    actions: { marginTop: 24, display: 'flex', gap: 12 }
+    actions: { marginTop: 24 }
 };
 
 export default function InputBusinessMetadata() {
-    const [level, setLevel] = useState('');
-    const [entities, setEntities] = useState([]);
-    const [entity, setEntity] = useState('');
+    const [level, setLevel] = useState('catalog');
+
+    const [catalogs, setCatalogs] = useState([]);
+    const [schemas, setSchemas] = useState([]);
+    const [tables, setTables] = useState([]);
+    const [columns, setColumns] = useState([]);
+
+    const [catalog, setCatalog] = useState('');
+    const [schema, setSchema] = useState('');
+    const [table, setTable] = useState('');
+    const [column, setColumn] = useState('');
+
     const [attributes, setAttributes] = useState([]);
     const [values, setValues] = useState({});
-    const [isExisting, setIsExisting] = useState(false);
 
     useEffect(() => {
-        if (!level) return;
-        setEntity('');
+        setCatalog('');
+        setSchema('');
+        setTable('');
+        setColumn('');
         setValues({});
-        setIsExisting(false);
-
-        getEntities(level).then(setEntities);
-        getMetadataAttributes().then(setAttributes);
+        getCatalogs().then(setCatalogs);
+        getMetadataAttributes(level).then(setAttributes);
     }, [level]);
 
+    useEffect(() => {
+        if (!catalog || !['schema', 'table', 'column'].includes(level)) return;
+        setSchema('');
+        setTable('');
+        setColumn('');
+        console.log('Fetching schemas for catalog:', catalog);
+        getSchemas(catalog).then(setSchemas);
+    }, [catalog, level]);
 
     useEffect(() => {
-        if (!entity || !level) return;
+        if (!schema || !['table', 'column'].includes(level)) return;
+        setTable('');
+        setColumn('');
+        getTables(catalog, schema).then(setTables);
+    }, [schema, level]);
 
-        getMetadata(level, entity).then(rows => {
-            if (rows && rows.length > 0) {
-                const kv = {};
-                rows.forEach(r => {
-                    kv[r.attribute_type] = r.value || '';
-                });
-                setValues(kv);
-                setIsExisting(true);
-            } else {
-                setValues({});
-                setIsExisting(false);
-            }
-        });
-    }, [entity, level]);
+    useEffect(() => {
+        if (!table || level !== 'column') return;
+        setColumn('');
+        getColumns(catalog, schema, table).then(setColumns);
+    }, [table, level]);
+
+    const resetAll = () => {
+        setCatalog('');
+        setSchema('');
+        setTable('');
+        setColumn('');
+
+        setSchemas([]);
+        setTables([]);
+        setColumns([]);
+
+        setValues({});
+    };
+
 
     const setVal = (k, v) =>
         setValues(prev => ({ ...prev, [k]: v }));
 
-
     const add = async () => {
-        await upsertMetadata({ level, entity, attributes: values });
-        alert('Metadata added');
-        setIsExisting(true);
-    };
+        const payload = {
+            level,
+            catalog,
+            schema: level !== 'catalog' ? schema : undefined,
+            table: ['table', 'column'].includes(level) ? table : undefined,
+            column: level === 'column' ? column : undefined,
+            attributes: values
+        };
 
-
-    const modify = async () => {
-        await upsertMetadata({ level, entity, attributes: values });
-        alert('Metadata updated');
-    };
-
-
-    const remove = async () => {
-        await deleteMetadata({ level, entity });
-        alert('Metadata deleted');
+        await upsertMetadata(payload);
+        alert('Metadata added successfully');
         setValues({});
-        setIsExisting(false);
     };
 
     return (
@@ -122,81 +141,109 @@ export default function InputBusinessMetadata() {
                         <button
                             key={l}
                             style={styles.button}
-                            onClick={() => setLevel(l.toLowerCase())}
+                            onClick={() => {
+                                resetAll();
+                                setLevel(l.toLowerCase());
+                            }}
+
                         >
                             {l}
                         </button>
                     ))}
                 </div>
 
-                {!level && (
-                    <p style={styles.subText}>Select level to input metadata.</p>
+                <h4 style={styles.heading}>
+                    Input: {level.toUpperCase()}
+                </h4>
+
+                {/* CATALOG */}
+                <div style={{ marginBottom: 16 }}>
+                    <label style={styles.label}>Catalog</label>
+                    <select
+                        style={{ ...styles.input, marginLeft: 12 }}
+                        value={catalog}
+                        onChange={e => setCatalog(e.target.value)}
+                    >
+                        <option value="">-- Select --</option>
+                        {catalogs.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* SCHEMA */}
+                {['schema', 'table', 'column'].includes(level) && catalog && (
+                    <div style={{ marginBottom: 16 }}>
+                        <label style={styles.label}>Schema</label>
+                        <select
+                            style={{ ...styles.input, marginLeft: 12 }}
+                            value={schema}
+                            onChange={e => setSchema(e.target.value)}
+                        >
+                            <option value="">-- Select --</option>
+                            {schemas.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                    </div>
                 )}
 
-                {level && (
-                    <>
-                        <h4 style={styles.heading}>
-                            Input: {level.charAt(0).toUpperCase() + level.slice(1)}
-                        </h4>
+                {/* TABLE */}
+                {['table', 'column'].includes(level) && schema && (
+                    <div style={{ marginBottom: 16 }}>
+                        <label style={styles.label}>Table</label>
+                        <select
+                            style={{ ...styles.input, marginLeft: 12 }}
+                            value={table}
+                            onChange={e => setTable(e.target.value)}
+                        >
+                            <option value="">-- Select --</option>
+                            {tables.map(t => (
+                                <option key={t} value={t}>{t}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
-                        <div style={{ marginBottom: 24 }}>
-                            <label style={styles.label}>Entity</label>
-                            <select
-                                style={{ ...styles.input, marginLeft: 12 }}
-                                value={entity}
-                                onChange={e => setEntity(e.target.value)}
-                            >
-                                <option value="">-- Select --</option>
-                                {entities.map(e => (
-                                    <option key={e} value={e}>{e}</option>
-                                ))}
-                            </select>
+                {/* COLUMN */}
+                {level === 'column' && table && (
+                    <div style={{ marginBottom: 24 }}>
+                        <label style={styles.label}>Column</label>
+                        <select
+                            style={{ ...styles.input, marginLeft: 12 }}
+                            value={column}
+                            onChange={e => setColumn(e.target.value)}
+                        >
+                            <option value="">-- Select --</option>
+                            {columns.map(c => (
+                                <option key={c} value={c}>{c}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                {/* ATTRIBUTES */}
+                {catalog  && (
+                    <>
+                        <h5 style={styles.heading}>Attributes</h5>
+                        <div style={styles.formGrid}>
+                            {attributes.map(attr => (
+                                <React.Fragment key={attr}>
+                                    <label style={styles.label}>{attr}</label>
+                                    <input
+                                        style={styles.input}
+                                        value={values[attr] || ''}
+                                        onChange={e => setVal(attr, e.target.value)}
+                                    />
+                                </React.Fragment>
+                            ))}
                         </div>
 
-                        {entity && (
-                            <>
-                                <h5 style={styles.heading}>Attributes</h5>
-
-                                <div style={styles.formGrid}>
-                                    {attributes.map(attr => (
-                                        <React.Fragment key={attr}>
-                                            <label style={styles.label}>{attr}</label>
-                                            <input
-                                                style={styles.input}
-                                                value={values[attr] || ''}
-                                                onChange={e => setVal(attr, e.target.value)}
-                                            />
-                                        </React.Fragment>
-                                    ))}
-                                </div>
-
-                                <div style={styles.actions}>
-                                    <button
-                                        style={styles.button}
-                                        onClick={add}
-                                        disabled={isExisting}
-                                    >
-                                        Add
-                                    </button>
-
-                                    <button
-                                        style={{ ...styles.button, ...styles.secondaryButton }}
-                                        onClick={modify}
-                                        disabled={!isExisting}
-                                    >
-                                        Modify
-                                    </button>
-
-                                    <button
-                                        style={{ ...styles.button, ...styles.dangerButton }}
-                                        onClick={remove}
-                                        disabled={!isExisting}
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </>
-                        )}
+                        <div style={styles.actions}>
+                            <button style={styles.button} onClick={add}>
+                                Add Metadata
+                            </button>
+                        </div>
                     </>
                 )}
             </div>

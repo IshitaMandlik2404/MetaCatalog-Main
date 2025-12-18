@@ -35,9 +35,6 @@ const styles = {
         fontSize: 14,
         transition: 'all 0.2s ease'
     },
-    secondaryButton: {
-        background: '#6b7280'
-    },
     dangerButton: {
         background: '#dc2626'
     },
@@ -72,7 +69,6 @@ const styles = {
     }
 };
 
-
 export default function BusinessMetadataConfig() {
     const [level, setLevel] = useState('');
     const [subjects, setSubjects] = useState([]);
@@ -87,6 +83,34 @@ export default function BusinessMetadataConfig() {
     useEffect(() => {
         subject ? getAttributeTypes(subject).then(setTypes) : setTypes([]);
     }, [subject]);
+
+    const handleAdd = async () => {
+        if (!level || !subject || !attributeType) {
+            alert('Please select level, subject and attribute type');
+            return;
+        }
+        try {
+            await addConfig({ entity_type: level, subject, attribute_type: attributeType });
+            alert('Configuration added successfully');
+        } catch (err) {
+            console.error(err);
+            alert('Error adding configuration');
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!level || !subject || !attributeType) {
+            alert('Please select level, subject and attribute type');
+            return;
+        }
+        try {
+            await deleteConfig({ entity_type: level, subject, attribute_type: attributeType });
+            alert('Configuration deleted successfully');
+        } catch (err) {
+            console.error(err);
+            alert('Error deleting configuration');
+        }
+    };
 
     return (
         <div style={styles.page}>
@@ -142,10 +166,10 @@ export default function BusinessMetadataConfig() {
                         </div>
 
                         <div style={styles.actions}>
-                            <button style={styles.button} onClick={() => addConfig({entity_type: level, subject, attribute_type: attributeType })}>
+                            <button style={styles.button} onClick={handleAdd}>
                                 Add
                             </button>
-                            <button style={{ ...styles.button, ...styles.dangerButton }} onClick={() => deleteConfig({entity_type: level, subject, attribute_type: attributeType })}>
+                            <button style={{ ...styles.button, ...styles.dangerButton }} onClick={handleDelete}>
                                 Delete
                             </button>
                         </div>

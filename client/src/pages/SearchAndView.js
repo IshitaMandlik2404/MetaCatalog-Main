@@ -62,7 +62,7 @@ export default function SearchAndView() {
                         <table style={styles.table}>
                             <thead>
                                 <tr>
-                                    {['S.No', 'Entity Type', 'Attribute Type', 'Attribute Value', 'Catalog Name', 'Created By', 'Created At'].map(h => (
+                                    {['S.No', 'Attribute Type', 'Attribute Value', 'Catalog Name', 'Created By', 'Created At'].map(h => (
                                         <th key={h} style={styles.th}>{h}</th>
                                     ))}
                                 </tr>
@@ -71,7 +71,6 @@ export default function SearchAndView() {
                                 {rows.map((r, index) => (
                                     <tr key={index}>
                                         <td style={styles.td}>{index + 1}</td> 
-                                        <td style={styles.td}>{r.entity_type}</td>
                                         <td style={styles.td}>{r.attribute_type}</td>
                                         <td style={styles.td}>{r.attribute_value}</td>
                                         <td style={styles.td}>{r.catalog_name}</td>
