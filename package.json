@@ -1,0 +1,22 @@
+
+{
+  "name": "metacatalog-server",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "^4.27.0",
+    "@azure/msal-react": "^3.0.23",
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "@databricks/sql": "^1.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

@@ -16,3 +16,15 @@ export const getCatalogs = () => api.get('/catalogs').then(r => r.data);
 export const getSchemas = (catalog) => api.get('/schemas',{ params: { catalog }}).then(r => r.data);
 export const getTables = (catalog, schema) => api.get('/tables',{ params: { catalog, schema }}).then(r => r.data);
 export const getColumns = (catalog, schema, table) => api.get('/columns',{ params: { catalog, schema, table }}).then(r => r.data);
+
+
+export async function getMetadataBootstrap({ level, catalog, schema, table, column }) {
+  const params = new URLSearchParams({ level, catalog });
+  if (schema) params.append('schema', schema);
+  if (table)  params.append('table', table);
+  if (column) params.append('column', column);
+
+  const res = await fetch(`/api/metadata/bootstrap?${params.toString()}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json(); // { attributeTypes, current, suggestions }
+}
